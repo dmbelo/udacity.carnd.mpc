@@ -3,8 +3,6 @@
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
 
-using CppAD::AD;
-
 // TODO: Set the timestep length and duration
 size_t N = 0;
 double dt = 0;
@@ -27,7 +25,7 @@ class FG_eval {
   Eigen::VectorXd coeffs;
   FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
 
-  typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
+  typedef CPPAD_TESTVECTOR(CppAD::AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
     // TODO: implement MPC
     // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)

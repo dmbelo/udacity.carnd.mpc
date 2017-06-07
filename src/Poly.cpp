@@ -1,11 +1,6 @@
 #include "Poly.h"
 
-Poly::Poly(Eigen::VectorXd x_vals, Eigen::VectorXd y_vals, int order) {
-
-    Fit(x_vals, y_vals, order);
-
-}
-
+Poly::Poly() {};
 Poly::~Poly() {};
 
 void Poly::Fit(Eigen::VectorXd x_vals, Eigen::VectorXd y_vals, int order) {

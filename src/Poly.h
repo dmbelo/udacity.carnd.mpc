@@ -7,7 +7,7 @@
 class Poly {
     public:
         Eigen::VectorXd coeffs;
-        Poly(Eigen::VectorXd x_vals, Eigen::VectorXd y_vals, int order);
+        Poly();
         virtual ~Poly();
         void Fit(Eigen::VectorXd x_vals, Eigen::VectorXd y_vals, int order);
         double Eval(double x);
