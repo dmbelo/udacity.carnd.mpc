@@ -6,7 +6,7 @@
 
 // TODO: Set the timestep length and duration
 size_t N = 10;
-double dt = 0.2;
+double dt = 0.05;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -33,7 +33,7 @@ size_t idx_r_throttle = idx_a_steer + N - 1;
 const double a = 2.67;
 
 // The reference velocity
-double v_car_ref = 30;
+double v_car_ref = 60;
 
 class FG_eval {
  public:
@@ -61,14 +61,14 @@ class FG_eval {
 
     // Minimize actuator magnitude
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 500 * CppAD::pow(vars[idx_a_steer + t], 2);
-      fg[0] += 100 * CppAD::pow(vars[idx_r_throttle + t], 2);
+      fg[0] += 1000 * CppAD::pow(vars[idx_a_steer + t], 2);
+      fg[0] += 1 * CppAD::pow(vars[idx_r_throttle + t], 2);
     }
 
     // Minimize actuator derivatives
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 500 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
-      fg[0] += 50 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
+      fg[0] += 2000 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
+      fg[0] += 5000 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
     }
 
     // Setup Constraints
