@@ -45,7 +45,8 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     std::string sdata = std::string(data).substr(0, length);
-    // std::cout << sdata << std::endl;
+    std::cout << "Message received" << std::endl;
+    std::cout << sdata << std::endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       std::string s = hasData(sdata);
       if (s != "") {
@@ -57,7 +58,7 @@ int main() {
           std::vector<double> y_waypts = j[1]["ptsy"];
           double x_car = j[1]["x"];
           double y_car = j[1]["y"];
-          double a_heading = j[1]["psi"];
+          double psi_car = j[1]["psi"];
           double v_car = j[1]["speed"];
 
           std::vector<double> xv_waypts, yv_waypts;
@@ -69,8 +70,8 @@ int main() {
             double mag = sqrt(dx * dx  + dy * dy);
             double theta = atan2(dy, dx);
 
-            xv_waypts.push_back(mag * cos(a_heading - theta));
-            yv_waypts.push_back(-mag * sin(a_heading - theta));
+            xv_waypts.push_back(mag * cos(psi_car - theta));
+            yv_waypts.push_back(-mag * sin(psi_car - theta));
             
           }
 
@@ -87,23 +88,36 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double a_steer;
-          double r_throttle;
+
+          // double cte_car = poly.Eval(x_car) - y_car;
+          // double err_psi_car = psi_car - atan(poly.Diff(x_car));
+
+          double cte_car, err_psi_car;
+
+          Eigen::VectorXd states(6);
+
+          states << x_car, y_car, psi_car, v_car, cte_car, err_psi_car;
+
+          // auto vars = mpc.Solve(states, poly);
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
+          // double a_steer = vars[6]/deg2rad(25);
+          // double r_throttle = vars[7];
+          double a_steer = 0.0;
+          double r_throttle = 0.0;
+
+          std::cout << a_steer << ", " << r_throttle << std::endl << std::endl;
+
           msgJson["steering_angle"] = a_steer;
           msgJson["throttle"] = r_throttle;
 
           //Display the MPC predicted trajectory 
-          std::vector<double> xv_pred_traj;
-          std::vector<double> yv_pred_traj;
-
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
+          // points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
-          msgJson["mpc_x"] = xv_pred_traj;
-          msgJson["mpc_y"] = yv_pred_traj;
+          msgJson["mpc_x"] = mpc.xv_opt_traj;
+          msgJson["mpc_y"] = mpc.yv_opt_traj;
 
           //Display the waypoints/reference line
 
@@ -113,7 +127,8 @@ int main() {
 
           for (double x = 0; x <= 50; x += 5.0) {
 
-            auto v = poly.Eval(x);
+            // double v = poly.Eval(x);
+            double v;
             xv_ref_traj.push_back(x);
             yv_ref_traj.push_back(v);
 
@@ -136,8 +151,10 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          // std::this_thread::sleep_for(std::chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          std::cout << "Message sent" << std::endl;
+
         }
       } else {
         // Manual driving

@@ -29,26 +29,30 @@ void Poly::Fit(Eigen::VectorXd x_vals, Eigen::VectorXd y_vals, int order) {
 
 }
 
-double Poly::Eval(double x) {
+// template <class Type>
+// Type Poly(const std::vector<double> &a, const Type &x)
+// template <class Type>
+// Type Poly::Eval(const Type x) {
     
-    double result = 0.0;
-    for (int i = 0; i < coeffs.size(); i++) {
-        result += coeffs[i] * pow(x, i);
-    }
+//     Type result = 0.0;
+//     for (int i = 0; i < coeffs.size(); i++) {
+//         result += coeffs[i] * pow(x, i);
+//     }
     
-    return result;
+//     return result;
 
-}
+// }
 
-double Poly::Diff(double x) {
+// template <class Type>
+// Type Poly::Diff(const Type x) {
 
-    double result = 0.0;
-    for (unsigned int i = 1; i < coeffs.size(); i++) {
-        result += i * coeffs[i] * pow(x, i - 1);
-    }
+//     Type result = 0.0;
+//     for (unsigned int i = 1; i < coeffs.size(); i++) {
+//         result += i * coeffs[i] * pow(x, i - 1);
+//     }
 
-    return result;
+//     return result;
 
-}
+// }
 
 
