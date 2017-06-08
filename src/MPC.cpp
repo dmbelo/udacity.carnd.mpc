@@ -6,7 +6,7 @@
 
 // TODO: Set the timestep length and duration
 size_t N = 10;
-double dt = 0.1;
+double dt = 0.2;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -33,13 +33,14 @@ size_t idx_r_throttle = idx_a_steer + N - 1;
 const double a = 2.67;
 
 // The reference velocity
-double v_car_ref = 3;
+double v_car_ref = 30;
 
 class FG_eval {
  public:
   // Fitted polynomial coefficients
-  Poly poly;
-  FG_eval(Poly poly) { this->poly = poly; }
+  // Poly poly;
+  Eigen::VectorXd coeffs;
+  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
 
   typedef CPPAD_TESTVECTOR(CppAD::AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -60,14 +61,14 @@ class FG_eval {
 
     // Minimize actuator magnitude
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += CppAD::pow(vars[idx_a_steer + t], 2);
-      fg[0] += CppAD::pow(vars[idx_r_throttle + t], 2);
+      fg[0] += 500 * CppAD::pow(vars[idx_a_steer + t], 2);
+      fg[0] += 100 * CppAD::pow(vars[idx_r_throttle + t], 2);
     }
 
     // Minimize actuator derivatives
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
-      fg[0] += CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
+      fg[0] += 500 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
+      fg[0] += 50 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
     }
 
     // Setup Constraints
@@ -108,11 +109,11 @@ class FG_eval {
       // Explicit 3rd order polynomial case
       CppAD::AD<double> x_car_0_squared = x_car_0 * x_car_0;
       CppAD::AD<double> x_car_0_cubed = x_car_0_squared * x_car_0;
-      // CppAD::AD<double> f_0 = poly.coeffs[0] + poly.coeffs[1] * x_car_0 + poly.coeffs[2] * x_car_0_squared + poly.coeffs[3] * x_car_0_cubed;
-      // CppAD::AD<double> psi_ref_0 = CppAD::atan(poly.coeffs[1] + 2 * poly.coeffs[2] * x_car_0 + 3 * poly.coeffs[3] * x_car_0_squared);
+      CppAD::AD<double> f_0 = coeffs[0] + coeffs[1] * x_car_0 + coeffs[2] * x_car_0_squared + coeffs[3] * x_car_0_cubed;
+      CppAD::AD<double> psi_ref_0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x_car_0 + 3 * coeffs[3] * x_car_0_squared);
       // Explicit 1st order polynomial case
-      CppAD::AD<double> f_0 = poly.coeffs[0] + poly.coeffs[1] * x_car_0;
-      CppAD::AD<double> psi_ref_0 = CppAD::atan(poly.coeffs[1]);
+      // CppAD::AD<double> f_0 = poly.coeffs[0] + poly.coeffs[1] * x_car_0;
+      // CppAD::AD<double> psi_ref_0 = CppAD::atan(poly.coeffs[1]);
       
 
       // Here's `x` to get you started.
@@ -140,7 +141,7 @@ class FG_eval {
 MPC::MPC() {}
 MPC::~MPC() {}
 
-std::vector<double> MPC::Solve(Eigen::VectorXd states, Poly poly) {
+std::vector<double> MPC::Solve(Eigen::VectorXd states, Eigen::VectorXd coeffs) {
   bool ok = true;
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
@@ -226,7 +227,7 @@ std::vector<double> MPC::Solve(Eigen::VectorXd states, Poly poly) {
   constraints_upperbound[idx_err_psi_car] = err_psi_car;
 
   // object that computes objective and constraints
-  FG_eval fg_eval(poly);
+  FG_eval fg_eval(coeffs);
 
   //
   // NOTE: You don't have to worry about these options
@@ -234,7 +235,7 @@ std::vector<double> MPC::Solve(Eigen::VectorXd states, Poly poly) {
   // options for IPOPT solver
   std::string options;
   // Uncomment this if you'd like more print information
-  options += "Integer print_level  5\n";
+  options += "Integer print_level  1\n";
   // NOTE: Setting sparse to true allows the solver to take advantage
   // of sparse routines, this makes the computation MUCH FASTER. If you
   // can uncomment 1 of these and see if it makes a difference or not but
@@ -248,32 +249,6 @@ std::vector<double> MPC::Solve(Eigen::VectorXd states, Poly poly) {
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;
-
-  // // Debug
-  // std::cout << "vars:" << std::endl;
-  // for (unsigned int i = 0; i < vars.size(); i++) {
-  //   std::cout << vars[i] << std::endl;
-  // }
-
-  // std::cout << "vars_lowerbound:" << std::endl;
-  // for (unsigned int i = 0; i < vars_lowerbound.size(); i++) {
-  //   std::cout << vars_lowerbound[i] << std::endl;
-  // }
-
-  // std::cout << "vars_upperbound:" << std::endl;
-  // for (unsigned int i = 0; i < vars_upperbound.size(); i++) {
-  //   std::cout << vars_upperbound[i] << std::endl;
-  // }
-
-  // std::cout << "constraints_lowerbound:" << std::endl;
-  // for (unsigned int i = 0; i < constraints_lowerbound.size(); i++) {
-  //   std::cout << constraints_lowerbound[i] << std::endl;
-  // }
-
-  // std::cout << "constraints_upperbound:" << std::endl;
-  // for (unsigned int i = 0; i < constraints_upperbound.size(); i++) {
-  //   std::cout << constraints_upperbound[i] << std::endl;
-  // }
 
   // solve the problem
   CppAD::ipopt::solve<Dvector, FG_eval>(
