@@ -4,12 +4,14 @@ cmake_minimum_required (VERSION 3.5)
 
 # -g allows for gdb debugging
 # turn on -03 for best performance
-add_definitions(-std=c++11 -O3 -g)
+# add_definitions(-std=c++11 -O3 -g)
+add_definitions(-std=c++11 -g)
 
 set(CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/Poly.cpp src/MPC.cpp src/main.cpp)
+set(sources src/Car.cpp src/MPC.cpp src/main.cpp)
+# set(sources src/Car.cpp)
 
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
@@ -26,4 +28,5 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 add_executable(mpc ${sources})
 
 target_link_libraries(mpc ipopt z ssl uv uWS)
+# target_link_libraries(mpc ipopt python z ssl uv uWS)
 

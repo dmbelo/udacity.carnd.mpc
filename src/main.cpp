@@ -2,15 +2,18 @@
 #include <uWS/uWS.h>
 #include <chrono>
 #include <iostream>
+// #include <fstream>
 #include <thread>
 #include <vector>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 #include "json.hpp"
+#include "Car.h"
 
 // for convenience
 using json = nlohmann::json;
+using namespace std::chrono;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -87,8 +90,11 @@ int main() {
 
   // MPC is initialized here!
   MPC mpc;
+  Car car(2.67);
 
-  h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+	// FILE *file;
+
+  h.onMessage([&mpc, &car](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -109,6 +115,8 @@ int main() {
           double y_car = j[1]["y"];
           double psi_car = j[1]["psi"];
           double v_car = j[1]["speed"];
+          double a_steer = j[1]["steering_angle"];
+          double r_throttle = j[1]["throttle"];
 
           std::vector<double> xv_waypts, yv_waypts;
           // Convert desired trajectory waypoints to vehicle coordinate system
@@ -143,27 +151,51 @@ int main() {
           *
           */
 
+          // Simulate vehicle for 100 ms to account for latency
+          // double dt = 0.100;
+          // const double a = 2.67;
+
+          // double x_car_squared = x_car * x_car;
+          // double x_car_cubed = x_car_squared * x_car;
+          // double f = coeffs[0] + coeffs[1] * x_car + coeffs[2] * x_car_squared + coeffs[3] * x_car_cubed;
+          // double psi_ref = atan(coeffs[1] + 2 * coeffs[2] * x_car + 3 * coeffs[3] * x_car_squared);
+
+          // double x_car_0 = 0 + v_car * dt;
+          // double y_car_0 = 0;
+          // double psi_car_0 = v_car / a * a_steer * dt;
+          // double v_car_0 = v_car + r_throttle * dt;
+          // double cte_car_0 = f - y_car + v_car * sin(err_psi_car) * dt;
+          // double err_psi_car_0 = psi_car - psi_ref + v_car / a * a_steer * dt;
+          double t_latency = 0.100;
+          unsigned int n_sim_steps = 20;
+          double dt = t_latency / n_sim_steps;
+
+          car.Reset();
+          car.v = v_car;
+          for (unsigned int i = 0; i < n_sim_steps; i++) {
+            car.Simulate(a_steer, r_throttle, dt);
+          }
+
           // double cte_car = poly.Eval(x_car) - y_car;
           // double err_psi_car = psi_car - atan(poly.Diff(x_car));
-          double cte_car = polyeval(coeffs, x_car) - y_car;
-          double err_psi_car = psi_car - atan(polydiff(coeffs, x_car));
-
-          Eigen::VectorXd states(6);
+          double cte_car = polyeval(coeffs, car.x) - car.y;
+          double err_psi_car = psi_car - atan(polydiff(coeffs, car.x));
 
           // Vehicle states in the vehicle coordinate system
-          states << 0, 0, 0, v_car, cte_car, err_psi_car;
+          Eigen::VectorXd states(6);
+          states << car.x, car.y, car.psi, car.v, cte_car, err_psi_car;
+
+          std::cout << car.x << car.y << car.psi << car.v << cte_car << err_psi_car << std::endl;
 
           auto vars = mpc.Solve(states, coeffs);
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          double a_steer = vars[6]/deg2rad(25);
-          double r_throttle = vars[7];
+          a_steer = vars[6]/deg2rad(25);
+          r_throttle = vars[7];
           // double a_steer = 0.0;
           // double r_throttle = 0.0;
-
-          std::cout << a_steer << ", " << r_throttle << std::endl << std::endl;
 
           msgJson["steering_angle"] = -a_steer;
           msgJson["throttle"] = r_throttle;
@@ -201,6 +233,12 @@ int main() {
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
+
+          // Write to file
+          milliseconds ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+          // fprintf(file, "%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n",
+                              // a_steer, r_throttle, x_car, y_car, psi_car, v_car);
+
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
@@ -210,8 +248,9 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+
 
         }
       } else {
@@ -237,12 +276,13 @@ int main() {
 
   h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
     std::cout << "Connected!!!" << std::endl;
+    // file = fopen("simout.txt", "w");
   });
 
-  h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code,
-                         char *message, size_t length) {
+  h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
     ws.close();
     std::cout << "Disconnected" << std::endl;
+    // fclose(file);
   });
 
   int port = 4567;

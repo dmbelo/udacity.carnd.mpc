@@ -61,14 +61,14 @@ class FG_eval {
 
     // Minimize actuator magnitude
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 1000 * CppAD::pow(vars[idx_a_steer + t], 2);
+      fg[0] += 1e3 * CppAD::pow(vars[idx_a_steer + t], 2);
       fg[0] += 1 * CppAD::pow(vars[idx_r_throttle + t], 2);
     }
 
     // Minimize actuator derivatives
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 2000 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
-      fg[0] += 5000 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
+      fg[0] += 5e6 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
+      fg[0] += 1e5 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
     }
 
     // Setup Constraints
