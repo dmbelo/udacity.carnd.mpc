@@ -6,7 +6,7 @@
 
 // TODO: Set the timestep length and duration
 size_t N = 10;
-double dt = 0.05;
+double dt = 0.1;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -33,7 +33,7 @@ size_t idx_r_throttle = idx_a_steer + N - 1;
 const double a = 2.67;
 
 // The reference velocity
-double v_car_ref = 60;
+double v_car_ref = 50;
 
 class FG_eval {
  public:
@@ -51,24 +51,24 @@ class FG_eval {
     
     // Cost function
     fg[0] = 0;
-    
+
     // Track the reference trajectory
     for (unsigned int t = 0; t < N; t++) {
-      fg[0] += CppAD::pow(vars[idx_cte_car + t], 2);
-      fg[0] += CppAD::pow(vars[idx_err_psi_car + t], 2);
-      fg[0] += CppAD::pow(vars[idx_v_car + t] - v_car_ref, 2);
+      fg[0] += 2 * CppAD::pow(vars[idx_cte_car + t], 2);
+      fg[0] += 1 * CppAD::pow(vars[idx_err_psi_car + t], 2);
+      fg[0] += 1 * CppAD::pow(vars[idx_v_car + t] - v_car_ref, 2);
     }
 
     // Minimize actuator magnitude
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 1e3 * CppAD::pow(vars[idx_a_steer + t], 2);
-      fg[0] += 1 * CppAD::pow(vars[idx_r_throttle + t], 2);
+      fg[0] += 5e4 * CppAD::pow(vars[idx_a_steer + t], 2);
+      fg[0] += 1e1 * CppAD::pow(vars[idx_r_throttle + t], 2);
     }
 
     // Minimize actuator derivatives
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 5e6 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
-      fg[0] += 1e5 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
+      fg[0] += 5e2 * CppAD::pow(vars[idx_a_steer + t + 1] - vars[idx_a_steer + t], 2);
+      fg[0] += 1e6 * CppAD::pow(vars[idx_r_throttle + t + 1] - vars[idx_r_throttle + t], 2);
     }
 
     // Setup Constraints
