@@ -2,7 +2,6 @@
 #include <uWS/uWS.h>
 #include <chrono>
 #include <iostream>
-// #include <fstream>
 #include <thread>
 #include <vector>
 #include "Eigen-3.3/Eigen/Core"
