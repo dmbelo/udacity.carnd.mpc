@@ -2,6 +2,7 @@
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
 #include "Poly.h"
+#include "Car.h"
 #include "matplotlibcpp.h"
 
 #define _USE_MATH_DEFINES
@@ -14,7 +15,7 @@ namespace plt = matplotlibcpp;
 double t_horizon = 1;
 
 size_t n_states = 6;
-size_t n_steps = 3;
+size_t n_steps = 10;
 size_t n_actuators = 2;
 size_t n_constraints = n_steps * n_states; 
 size_t n_vars = n_states * n_steps + n_actuators * (n_steps - 1);
@@ -29,14 +30,32 @@ size_t idx_v_car = idx_psi_car + n_steps;
 size_t idx_cte_car = idx_v_car + n_steps;
 size_t idx_err_psi_car = idx_cte_car + n_steps;
 size_t idx_a_steer = idx_err_psi_car + n_steps;
-size_t idx_r_throttle = idx_a_steer + n_steps - 1;
+size_t idx_g_accel = idx_a_steer + n_steps - 1;
 
 double l_front = 2.67;
-double v_car_ref = 40;
+double v_car_ref = 34;
 double dt = t_horizon / n_steps;
 
 double max_a_steer = 25.0 * M_PI / 180.0;
 double max_r_throttle = 1.0;
+
+struct control{
+    double a_steer;
+    double g_accel;
+};
+
+struct mpc{
+    double cte;
+    double err_psi;
+    double err_v_car;
+    double mag_a_steer;
+    double mag_g_accel;
+};
+
+struct output{
+    control u;
+    mpc m;
+};
 
 class FG_eval {
 
@@ -45,6 +64,8 @@ class FG_eval {
         AD<double> cte;
         AD<double> err_psi;
         AD<double> err_v_car;
+        AD<double> mag_a_steer;
+        AD<double> mag_g_accel;
         Eigen::VectorXd coeffs;
 
         FG_eval(Eigen::VectorXd coeffs) {
@@ -60,21 +81,23 @@ class FG_eval {
             //******************************
         
             cte = 0;
-            for (size_t t = 0; t < n_steps; t++) {
-                cte += x[idx_cte_car + t];
-            }
-
             err_psi = 0;
-            for (size_t t = 0; t < n_steps; t++) {
-                err_psi += x[idx_err_psi_car + t];
-            }
-
             err_v_car = 0;
             for (size_t t = 0; t < n_steps; t++) {
-                err_v_car += x[idx_v_car + t] - v_car_ref;
+                cte += 1e4 * pow(x[idx_cte_car + t], 2);
+                err_psi += 1e5 * pow(x[idx_err_psi_car + t], 2);
+                err_v_car += 1e0 * pow(x[idx_v_car + t] - v_car_ref, 2);
             }
 
-            fg[0] = cte + err_psi + err_v_car;
+            mag_a_steer = 0;
+            mag_g_accel = 0;
+            for (size_t t = 0; t < n_steps - 1; t++) {
+                mag_a_steer += 0e1 * pow(x[idx_a_steer + t], 2);
+                mag_g_accel += 0e1 * pow(x[idx_g_accel + t], 2);
+            }
+
+
+            fg[0] = cte + err_psi + err_v_car + mag_a_steer + mag_g_accel;
 
             //******************************
             // Constraints
@@ -109,7 +132,7 @@ class FG_eval {
 
                 // Actuators at t
                 AD<double> a_steer_0 = x[idx_a_steer + t - 1];
-                AD<double> r_throttle_0 = x[idx_r_throttle + t - 1];
+                AD<double> r_throttle_0 = x[idx_g_accel + t - 1];
 
                 CppAD::AD<double> x_car_0_squared = x_car_0 * x_car_0;
                 CppAD::AD<double> x_car_0_cubed = x_car_0_squared * x_car_0;
@@ -132,7 +155,9 @@ class FG_eval {
 };
 
 
-bool solve(Eigen::VectorXd states, Eigen::VectorXd coeffs) {
+output solve(Eigen::VectorXd states, Eigen::VectorXd coeffs) {
+
+    output o; 
 
     bool ok = true;
     size_t i;
@@ -168,12 +193,12 @@ bool solve(Eigen::VectorXd states, Eigen::VectorXd coeffs) {
     //     xu[i] = max_v_car;
     // }
 
-    for (i = idx_a_steer; i < idx_r_throttle; i++) {
+    for (i = idx_a_steer; i < idx_g_accel; i++) {
         xl[i] = -max_a_steer;
         xu[i] = max_a_steer;
     }
 
-    for (i = idx_r_throttle; i < n_vars; i++) {
+    for (i = idx_g_accel; i < n_vars; i++) {
         xl[i] = -max_r_throttle;
         xu[i] = max_r_throttle;
     }
@@ -229,7 +254,18 @@ bool solve(Eigen::VectorXd states, Eigen::VectorXd coeffs) {
     // Check some of the solution values
     ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
 
-    return ok;
+    // Evaluate constraints with solution
+    // fg_eval(solution.x);
+
+    o.u.a_steer = solution.x[idx_a_steer];
+    o.u.g_accel = solution.x[idx_g_accel];
+    o.m.cte = Value(fg_eval.cte);
+    o.m.err_psi = Value(fg_eval.err_psi);
+    o.m.err_v_car = Value(fg_eval.err_v_car);
+    o.m.mag_a_steer = Value(fg_eval.mag_a_steer);
+    o.m.mag_g_accel = Value(fg_eval.mag_g_accel);
+
+    return o;
 
 }
 
@@ -237,6 +273,7 @@ bool solve(Eigen::VectorXd states, Eigen::VectorXd coeffs) {
 int main() {
 
     Poly poly;
+    output o;
 
     Eigen::VectorXd x_waypts(8); 
     Eigen::VectorXd y_waypts(8); 
@@ -255,16 +292,55 @@ int main() {
         x += dx;
     }
 
+    // Simulation
+    Car car(l_front);
+    car.v = 30;
+    car.psi = 0 * M_PI/180.0;
+
+    vector<double> x_car;
+    vector<double> y_car;
+    vector<double> psi_car;
+    vector<double> v_car;
+    vector<double> a_steer;
+    vector<double> g_accel;
+    vector<double> cte, err_psi, err_v_car, mag_a_steer, mag_g_accel;
+
+    size_t n_sim_steps = 50;
+    double dt_sim = 0.1;
+
     Eigen::VectorXd states(6);
-
     states << 0.0, 0.0, 0.0, 5.0, 0.0, 0.0;
+    for (size_t i = 0; i < n_sim_steps; i++) {
 
-    if (solve(states, poly.coeffs)) {
-        std::cout << "Success" << std::endl;
+        // Update state vector
+        car.cte = (poly.Eval(car.x) - car.y) * cos(car.psi);
+        car.err_psi = car.psi - atan(poly.Diff(car.x));
+
+        states << car.x, car.y, car.psi, car.v, car.cte, car.err_psi;
+        o = solve(states, poly.coeffs);
+        car.Step(o.u.a_steer, o.u.g_accel, dt_sim);
+        
+        // Logging
+        x_car.push_back(car.x);
+        y_car.push_back(car.y);
+        psi_car.push_back(car.psi);
+        v_car.push_back(car.v);
+        a_steer.push_back(o.u.a_steer);
+        g_accel.push_back(o.u.g_accel);
+        cte.push_back(o.m.cte);
+        err_psi.push_back(o.m.err_psi);
+        err_v_car.push_back(o.m.err_v_car);
+        mag_a_steer.push_back(o.m.mag_a_steer);
+        mag_g_accel.push_back(o.m.mag_g_accel); 
+
     }
-    else {
-        std::cout << "Fail" << std::endl;
-    }
+
+    // if (solve(states, poly.coeffs)) {
+    //     std::cout << "Success" << std::endl;
+    // }
+    // else {
+    //     std::cout << "Fail" << std::endl;
+    // }
 
     //******************************
     // Plotting
@@ -278,8 +354,35 @@ int main() {
     yw.resize(y_waypts.size());
     Eigen::VectorXd::Map(&yw[0], y_waypts.size()) = y_waypts;
 
+    // vector<double> x_car_;
+    // x_car_.resize(x_car.size());
+    // Eigen::VectorXd::Map(&x_car_[0], x_car.size()) = x_car;
+    
+    // vector<double> y_car_;
+    // y_car_.resize(y_car.size());
+    // Eigen::VectorXd::Map(&y_car_[0], y_car.size()) = y_car;
+
+    plt::subplot(4,1,1);
     plt::plot(xw, yw, "o");
     plt::plot(xf, yf);
+    plt::plot(x_car, y_car, "-*");
+
+    plt::subplot(4,1,2);
+    plt::named_plot("vCar", v_car);
+
+    plt::subplot(4,1,3);
+    plt::named_plot("aSteer", a_steer);
+    plt::named_plot("gAccel", g_accel);
+    plt::legend();
+
+    plt::subplot(4,1,4);
+    plt::named_plot("CTE", cte);
+    plt::named_plot("Err aCar", err_psi);
+    plt::named_plot("Err vCar", err_v_car, "-*");
+    plt::named_plot("Mag aSteer", mag_a_steer, "-+");
+    plt::named_plot("Mag gAccel", mag_g_accel, "-o");
+    plt::legend();
+
     plt::show();
 
     return 0;
