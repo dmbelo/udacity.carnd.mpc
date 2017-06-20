@@ -1,0 +1,14 @@
+{
+  "objective": {
+      "cte": 1e4,
+      "err_psi": 1e5,
+      "err_v_car": 1,
+      "mag_a_steer": 10,
+      "mag_g_accel": 10
+  },
+  "control": {
+      "t_horizon": 1,
+      "n_steps": 10,
+      "v_car_ref": 34
+  }
+}
