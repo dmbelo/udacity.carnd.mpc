@@ -4,7 +4,6 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Poly.h"
 #include "Car.h"
-#include "matplotlibcpp.h"
 #include "json.hpp"
 
 #define _USE_MATH_DEFINES
@@ -13,8 +12,6 @@
 using CppAD::AD;
 using std::vector;
 using json = nlohmann::json;
-
-namespace plt = matplotlibcpp;
 
 double l_front = 2.67;
 double v_car_ref = 34;
@@ -311,10 +308,11 @@ output<double> solve(Eigen::VectorXd states, Eigen::VectorXd coeffs, params p, i
 int main(int argc, char *argv[]) {
 
     // Read json file with params
-    std::ifstream file;
-    file.open(argv[1]);
+    std::ifstream param_file;
+    param_file.open(argv[1]);
     json user_params;
-    file >> user_params;
+    param_file >> user_params;
+    param_file.close();
 
     params p;
 
@@ -403,17 +401,6 @@ int main(int argc, char *argv[]) {
 
     }
 
-    // if (solve(states, poly.coeffs)) {
-    //     std::cout << "Success" << std::endl;
-    // }
-    // else {
-    //     std::cout << "Fail" << std::endl;
-    // }
-
-    //******************************
-    // Plotting
-    //******************************
-
     vector<double> xw;
     xw.resize(x_waypts.size());
     Eigen::VectorXd::Map(&xw[0], x_waypts.size()) = x_waypts;
@@ -422,39 +409,32 @@ int main(int argc, char *argv[]) {
     yw.resize(y_waypts.size());
     Eigen::VectorXd::Map(&yw[0], y_waypts.size()) = y_waypts;
 
-    // vector<double> x_car_;
-    // x_car_.resize(x_car.size());
-    // Eigen::VectorXd::Map(&x_car_[0], x_car.size()) = x_car;
+    //******************************
+    // JSON Results file
+    //******************************
+    std::ofstream json_file;
+    json_file.open("json_results.txt");
+
+    json j_results;
     
-    // vector<double> y_car_;
-    // y_car_.resize(y_car.size());
-    // Eigen::VectorXd::Map(&y_car_[0], y_car.size()) = y_car;
+    j_results["waypoints"]["nodes"]["x"] = xw;
+    j_results["waypoints"]["nodes"]["y"] = yw;
+    j_results["waypoints"]["fit"]["x"] = xf;
+    j_results["waypoints"]["fit"]["y"] = yf;
+    j_results["sim"]["xCar"] = x_car;
+    j_results["sim"]["yCar"] = y_car;
+    j_results["sim"]["vCar"] = v_car;
+    j_results["sim"]["psiCar"] = psi_car;
+    j_results["sim"]["aSteer"] = a_steer;
+    j_results["sim"]["gAccel"] = g_accel;
+    j_results["sim"]["cte"] = cte;
+    j_results["sim"]["err_psiCar"] = err_psi;
+    j_results["sim"]["err_vCar"] = err_v_car;
+    j_results["sim"]["mag_aSteer"] = mag_a_steer;
+    j_results["sim"]["mag_gAccel"] = mag_g_accel;
 
-    plt::subplot(5,1,1);
-    plt::plot(xw, yw, "o");
-    plt::plot(xf, yf);
-    plt::plot(x_car, y_car, "-*");
-
-    plt::subplot(5,1,2);
-    plt::named_plot("vCar", v_car);
-
-    plt::subplot(5,1,3);
-    plt::named_plot("aSteer", a_steer);
-    plt::legend();
-
-    plt::subplot(5,1,4);
-    plt::named_plot("gAccel", g_accel);
-    plt::legend();
-
-    plt::subplot(5,1,5);
-    plt::named_plot("CTE", cte);
-    plt::named_plot("Err aCar", err_psi);
-    plt::named_plot("Err vCar", err_v_car, "-*");
-    plt::named_plot("Mag aSteer", mag_a_steer, "-+");
-    plt::named_plot("Mag gAccel", mag_g_accel, "-o");
-    plt::legend();
-
-    plt::show();
+    json_file << j_results;
+    json_file.close();
 
     return 0;
 

@@ -50,4 +50,4 @@ link_directories(/usr/local/lib)
 
 add_executable(nlp ${sources})
 
-target_link_libraries(nlp ipopt python)
+target_link_libraries(nlp ipopt)
